@@ -52,12 +52,14 @@ extern int interpretiere(Kommando k, int forkexec);
 extern void init(Process *p);
 
 int shellpid;
+Process *p;
 
 Process *hshell;
 
 Process *newProcList(){
   Process *neu = malloc(sizeof (struct process));
-  neu->pid = getpid();
+  neu->pid = shellpid;
+  neu->pgid = getpgid(getpid());
   neu->status = -1;
   neu->next = NULL;
   neu->name = "shell";
@@ -93,13 +95,39 @@ void endesubprozess (int sig){
   }
 }
 
+void sig_handler(int signum) {
+  switch(signum) {
+  case SIGINT: 
+    fprintf(stderr, "  Beenden mit exit\n");
+    fputs("Florian/Kevin>> ", stdout);
+    fflush(stdout);
+    break;
+  case SIGTSTP:
+    p->status = 4;
+    kill(p->pid, SIGTERM);
+    fprintf(stderr, "  Prozess: %d mit STRG Z Beendet\n", p->pgid);
+    fputs("Florian/Kevin>> ", stdout);
+    fflush(stdout);
+    break;
+/*case SIGCHLD:
+    int ret_wp;
+    while(ret_wp > 1) {
+      ret_wp = waitpid(-1, &child_state, WNOHANG|WUNTRACED|WCONTINUED);
+    }
+    break; */
+  default:
+    fprintf(stderr, "Nothing happend\n");
+  }
+}
+
 void init_signalbehandlung(){
   struct sigaction action;
   action.sa_handler = endesubprozess;
   action.sa_flags = SA_RESTART | SA_NODEFER;
   action.sa_flags &= ~SA_RESETHAND;
   if(sigaction(SIGCHLD,&action,NULL)==-1){
-    perror("Error in Sigaction");exit(1);
+    perror("Error in Sigaction");
+    exit(1);
   }
 }
 
@@ -108,7 +136,7 @@ int main(int argc, char *argv[]){
   int status, i;
 
   init_signalbehandlung();
-
+  shellpid = getpid();
   hshell = newProcList();
   init(hshell);
 
@@ -127,9 +155,12 @@ int main(int argc, char *argv[]){
     }
   }
 
+
   wsp=wortspeicherNeu();
 
   while(1){
+    signal(SIGINT, sig_handler);
+    signal(SIGTSTP, sig_handler);
     int res;
     fputs("Florian/Kevin>> ", stdout);
     fflush(stdout);

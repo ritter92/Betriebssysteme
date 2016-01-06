@@ -22,9 +22,10 @@ int interpretiere(Kommando k, int forkexec);
 Process *h; /*wird von shell.c initialisiert*/
 Process *p;
 
-Process *newProcess(pid_t pid, char * string){
+Process *newProcess(pid_t pid, pid_t pgid, char * string){
   Process *neu = malloc(sizeof (struct process));
   neu->pid = pid;
+  neu->pgid = pgid;
   neu->status = -1;
   neu->next = NULL;
   neu->name = string;
@@ -43,22 +44,25 @@ void show(Process *h){
   while(p != NULL){
     switch (p->status){
       case -1:
-        printf("%d \t %d \t running      %s\n", p->pid, getpgid(p->pid), p->name);
+        printf("%d \t %d \t running      %s\n", p->pid, p->pgid, p->name);
         break;
       case 0:
-        printf("%d \t %d \t exit(0)      %s\n", p->pid, getpgid(p->pid), p->name);
+        printf("%d \t %d \t exit(0)      %s\n", p->pid, p->pgid, p->name);
         break;
       case 1:
-        printf("%d \t %d \t exit(1)      %s\n", p->pid, getpgid(p->pid), p->name);
+        printf("%d \t %d \t exit(1)      %s\n", p->pid, p->pgid, p->name);
         break;
       case 2:
-        printf("%d \t %d \t exit(2)    %s\n", p->pid, getpgid(p->pid), p->name);
+        printf("%d \t %d \t exit(2)    %s\n", p->pid, p->pgid, p->name);
         break;
       case 3:
-        printf("%d \t %d \t exit(3)    %s\n", p->pid, getpgid(p->pid), p->name);
+        printf("%d \t %d \t exit(3)    %s\n", p->pid, p->pgid, p->name);
+        break;
+      case 4:
+        printf("%d \t %d \t stopped    %s\n", p->pid, p->pgid, p->name);
         break;
       default:
-        printf("%d \t signal(%02d)   %s\n", p->pid, p->status,p->name);
+        printf("%d \t %d \t signal(%02d)   %s\n", p->pid, p->pgid, p->status,p->name);
         break;
     }
     
@@ -111,8 +115,12 @@ int umlenkungen(Kommando k){
       if(u->modus==APPEND){
         fd = open(u->pfad, O_WRONLY | O_CREAT | O_APPEND, 0640);
       }
-      if(fd==-1){perror("Could not open file! Does it exist?\n");}
-      if(dup2(fd,u->filedeskriptor)==-1){perror("Error in dup2()!\n");};
+      if(fd==-1){
+        perror("Could not open file! Does it exist?\n");
+      }
+      if(dup2(fd,u->filedeskriptor)==-1){
+        perror("Error in dup2()!\n");
+      };
       u = listeKopf(ul);
       fprintf(stderr, "%d%s %s\n", u->filedeskriptor, u->modus==READ ? "< " : u->modus==WRITE ? "> " : ">> ", u->pfad);
       ul = listeRest(ul);
@@ -128,15 +136,14 @@ int aufruf(Kommando k, int forkexec){
   */
   int child_state;
   int ret_wait;
-  pid_t pid;
-  pid_t pgid;
   char  * worte = malloc(100 * sizeof(char)); /*20 Zeichen*/
   strcpy(worte, k->u.einfach.worte[0]);
 
   if(forkexec == 1){
-    pid=fork();
-    pgid=pid;
-    p = newProcess(0, worte);
+    pid_t pid=fork();
+    setpgid(pid, pid);
+    pid_t pgid = getpgid(pid);
+    p = newProcess(0, pgid, worte);
     append(h,p);
 
     switch (pid){
@@ -149,8 +156,9 @@ int aufruf(Kommando k, int forkexec){
       do_execvp(k->u.einfach.wortanzahl, k->u.einfach.worte);
       abbruch("interner Fehler 001"); /* sollte nie ausgeführt werden */
     default:
+      p->pid = pid;
       if(k->endeabwarten){
-        ret_wait = waitpid(pid, &child_state, 0);
+        ret_wait = waitpid(pgid, &child_state, 0);
         if(ret_wait == pid){
           p->status = 0;
           if(child_state == 256){
@@ -163,7 +171,7 @@ int aufruf(Kommando k, int forkexec){
         } 
       } else {
           fprintf(stderr, "PID: %d\n", pid);
-          fprintf(stderr, "PGID: %d\n", setpgid(pid, pgid)); //??????
+          fprintf(stderr, "PGID: %d\n", getpgid(pid)); //??????
           return 0;
         }
     }

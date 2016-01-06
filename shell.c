@@ -90,7 +90,7 @@ void endesubprozess (int sig){
     if(p == NULL){
       hshell->next->status = WEXITSTATUS(child_state) + WTERMSIG(child_state);
     }else{
-      p->status = WEXITSTATUS(child_state) + WTERMSIG(child_state); /*exit(error)*/
+      p->status = WEXITSTATUS(child_state) + WTERMSIG(child_state);
     }
   }
 }

@@ -19,7 +19,7 @@
 
 int interpretiere(Kommando k, int forkexec);
 
-Process *h; /*wird von shell.c initialisiert*/
+Process *h;
 Process *p;
 
 Process *newProcess(pid_t pid, pid_t pgid, char * string){
@@ -136,7 +136,7 @@ int aufruf(Kommando k, int forkexec){
   */
   int child_state;
   int ret_wait;
-  char  * worte = malloc(100 * sizeof(char)); /*20 Zeichen*/
+  char  * worte = malloc(100 * sizeof(char));
   strcpy(worte, k->u.einfach.worte[0]);
 
   if(forkexec == 1){
